@@ -1,13 +1,14 @@
 
-
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useNavigate } from "react-router-dom";
 import ProductoForm from "../components/ProductoForm.jsx";
 import ProductoEditar from "../components/ProductoEditar.jsx";
 import "./InventarioPage.css";
 
 export default function InventarioPage() {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
   const [productos, setProductos] = useState([]);
   const [editando, setEditando] = useState(null);
   const [filtroNombre, setFiltroNombre] = useState("");
@@ -41,12 +42,46 @@ export default function InventarioPage() {
   
   async function cargarProductos() {
     try {
-      const res = await fetch("http://localhost:3000/api/productos");
-      const data = await res.json();
+      if (!isLoggedIn || !token) {
+        setProductos([]);
+        mostrarMensaje(
+          "error",
+          "Necesitás iniciar sesión para ver los productos."
+        );
+        return;
+      }
+
+      const res = await fetch("http://localhost:3000/api/productos", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        setProductos([]);
+        mostrarMensaje(
+          "error",
+          "Tu sesión no es válida o expiró. Volvé a iniciar sesión."
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Error al obtener productos");
+      }
+
+      if (!Array.isArray(data)) {
+        console.error("Respuesta inesperada de /api/productos:", data);
+        throw new Error("Formato de respuesta inesperado");
+      }
+
       setProductos(data);
     } catch (err) {
       console.error("Error al cargar productos:", err);
       mostrarMensaje("error", "No se pudieron cargar los productos.");
+      setProductos([]);
     }
   }
 
@@ -70,7 +105,8 @@ export default function InventarioPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Error al eliminar producto");
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al eliminar producto");
       }
 
       await cargarProductos();
@@ -105,10 +141,12 @@ export default function InventarioPage() {
     setEditando(prod);
   }
 
-  const productosFiltrados = productos.filter((p) => {
-    const texto = (p.nombre || "").toLowerCase();
-    return texto.includes(filtroNombre.toLowerCase());
-  });
+  const productosFiltrados = Array.isArray(productos)
+    ? productos.filter((p) => {
+        const texto = (p.nombre || "").toLowerCase();
+        return texto.includes(filtroNombre.toLowerCase());
+      })
+    : [];
 
   
   // Gestión de usuarios
@@ -117,11 +155,34 @@ export default function InventarioPage() {
     if (!isAdmin) return;
 
     try {
-      const res = await fetch("http://localhost:3000/api/usuarios");
-      const data = await res.json();
+      const res = await fetch("http://localhost:3000/api/usuarios", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      // Manejo explícito de 401/403
+      if (res.status === 401 || res.status === 403) {
+        setUsuarios([]);
+        mostrarMensaje(
+          "error",
+          data.error || "No estás autorizado a ver usuarios."
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Error al cargar usuarios");
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error("Respuesta inesperada del servidor de usuarios");
+      }
+
       setUsuarios(data);
     } catch (err) {
       console.error("Error al cargar usuarios:", err);
+      setUsuarios([]); // siempre dejamos array
       mostrarMensaje("error", "No se pudieron cargar los usuarios.");
     }
   }
@@ -205,8 +266,13 @@ export default function InventarioPage() {
   // Efectos
   
   useEffect(() => {
-    cargarProductos();
-  }, []);
+    if (isLoggedIn && token) {
+      cargarProductos();
+    } else {
+      setProductos([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, token]);
 
   // Cargar usuarios solo cuando soy admin y estoy en la pestaña Usuarios
   useEffect(() => {
@@ -375,7 +441,10 @@ export default function InventarioPage() {
                 <div className="inventario-card">
                   <span className="inventario-card-label">Stock global</span>
                   <span className="inventario-card-value">
-                    {productos.reduce((total, p) => total + (p.stock || 0), 0)}
+                    {productos.reduce(
+                      (total, p) => total + (p.stock || 0),
+                      0
+                    )}
                   </span>
                   <span className="inventario-card-helper">
                     Unidades disponibles
@@ -430,6 +499,15 @@ export default function InventarioPage() {
                           <td className="td-actions">
                             {isLoggedIn ? (
                               <>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() =>
+                                    navigate(`/producto/${producto.id}`)
+                                  }
+                                >
+                                  Ver detalle
+                                </button>
                                 <button
                                   type="button"
                                   className="btn btn-ghost"
@@ -541,7 +619,7 @@ export default function InventarioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.length === 0 ? (
+                  {!Array.isArray(usuarios) || usuarios.length === 0 ? (
                     <tr>
                       <td
                         colSpan="4"
@@ -592,4 +670,3 @@ export default function InventarioPage() {
     </div>
   );
 }
-

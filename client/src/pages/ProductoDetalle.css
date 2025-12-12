@@ -1,0 +1,187 @@
+
+.detalle-layout {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.detalle-container {
+  width: 100%;
+  max-width: 960px;
+}
+
+/* HEADER */
+
+.detalle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.detalle-kicker {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6b7280;
+  margin: 0 0 0.25rem;
+}
+
+.detalle-title {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin: 0 0 0.4rem;
+}
+
+.detalle-subtitle {
+  font-size: 0.95rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.detalle-back-btn {
+  align-self: center;
+}
+
+/* CARD GENÉRICA */
+
+.detalle-card {
+  background: radial-gradient(circle at top left, #111827, #020617);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.8);
+  padding: 1.75rem 1.9rem 1.6rem;
+  color: #e5e7eb;
+}
+
+/* ESTADOS */
+
+.detalle-card--loading,
+.detalle-card--error {
+  text-align: center;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.detalle-card--error p {
+  margin-bottom: 1rem;
+  color: #fca5a5;
+}
+
+/* CARD PRINCIPAL */
+
+.detalle-card--main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* META */
+
+.detalle-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.detalle-id {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #9ca3af;
+}
+
+.detalle-category-badge {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #22c55e);
+  color: #022c22;
+  font-weight: 600;
+}
+
+/* NOMBRE GRANDE */
+
+.detalle-product-name {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+/* GRID DE CAMPOS */
+
+.detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.2rem 1.5rem;
+}
+
+.detalle-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detalle-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6b7280;
+}
+
+.detalle-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.detalle-value--price {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.detalle-value--stock {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #a5b4fc;
+}
+
+/* FOOTER */
+
+.detalle-footer {
+  margin-top: 0.5rem;
+}
+
+.detalle-helper {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+  .detalle-layout {
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .detalle-card {
+    padding: 1.4rem 1.4rem 1.3rem;
+  }
+
+  .detalle-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detalle-back-btn {
+    align-self: flex-start;
+  }
+}

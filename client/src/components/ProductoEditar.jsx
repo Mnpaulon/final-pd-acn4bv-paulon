@@ -1,5 +1,4 @@
 
-
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -49,7 +48,7 @@ export default function ProductoEditar({ producto, onUpdated, onCancel }) {
       const res = await fetch(
         `http://localhost:3000/api/productos/${producto.id}`,
         {
-          method: "PATCH",
+          method: "PUT", // 👈 IMPORTANTE: coincide con el backend
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -63,13 +62,13 @@ export default function ProductoEditar({ producto, onUpdated, onCancel }) {
         }
       );
 
+      const body = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Error al actualizar producto.");
       }
 
-      const actualizado = await res.json();
-      if (onUpdated) onUpdated(actualizado);
+      if (onUpdated) onUpdated(body);
     } catch (err) {
       console.error("Error al actualizar producto:", err);
       setError(err.message || "No se pudo actualizar el producto.");
@@ -132,11 +131,7 @@ export default function ProductoEditar({ producto, onUpdated, onCancel }) {
         </label>
       </div>
 
-      {error && (
-        <div className="form-error">
-          {error}
-        </div>
-      )}
+      {error && <div className="form-error">{error}</div>}
 
       <div className="form-actions">
         <button

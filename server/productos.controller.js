@@ -1,61 +1,116 @@
 
+// server/productos.controller.js
+import { dbAll, dbGet, dbRun } from "./db/database.js";
 
-import fs from "fs/promises";
-
-// Archivo JSON de productos
-const DATA_FILE = new URL("./productos.json", import.meta.url);
-
-
-// FUNCIONES AUXILIARES
-
-async function leerProductos() {
-  const data = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(data);
-}
-
-async function guardarProductos(lista) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(lista, null, 2));
-}
-
-
+// ============================================
 // VALIDACIÓN
-
+// ============================================
 function validarProducto({ nombre, precio, categoria, stock }) {
   const errores = [];
 
-  if (!nombre || !String(nombre).trim())
+  if (!nombre || !String(nombre).trim()) {
     errores.push("Nombre es obligatorio");
+  }
 
-  if (!categoria || !String(categoria).trim())
+  if (!categoria || !String(categoria).trim()) {
     errores.push("Categoría es obligatoria");
+  }
 
   const pr = Number(precio);
-  if (!Number.isFinite(pr) || pr > 0)
+  if (!Number.isFinite(pr) || pr < 0) {
     errores.push("El precio debe ser un número válido (>= 0)");
+  }
 
   const st = Number(stock);
-  if (!Number.isInteger(st) || st >= 0)
+  if (!Number.isInteger(st) || st < 0) {
     errores.push("El stock debe ser un número entero >= 0");
+  }
 
   return errores;
 }
 
+// ============================================
+// HELPER: obtener o crear categoría
+// ============================================
+async function obtenerCategoriaId(nombreCategoria) {
+  const cat = await dbGet(
+    "SELECT id FROM categorias WHERE nombre = ?",
+    [nombreCategoria]
+  );
 
+  if (cat) return cat.id;
+
+  // Si no existe, la creamos
+  const result = await dbRun(
+    "INSERT INTO categorias (nombre) VALUES (?)",
+    [nombreCategoria]
+  );
+
+  return result.id;
+}
+
+// ============================================
 // GET /api/productos
-
+// ============================================
 export async function getProductos(req, res) {
   try {
-    const productos = await leerProductos();
+    const productos = await dbAll(
+      `SELECT 
+          p.id,
+          p.nombre,
+          p.precio,
+          p.stock,
+          c.nombre AS categoria
+        FROM productos p
+        JOIN categorias c ON c.id = p.categoria_id
+        ORDER BY p.id ASC`
+    );
+
     res.json(productos);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al leer productos" });
+    console.error("Error al obtener productos:", err);
+    res.status(500).json({ error: "Error al obtener productos" });
   }
 }
 
+// ============================================
+// GET /api/productos/:id  (para vista detalle)
+// ============================================
+export async function getProductoPorId(req, res) {
+  try {
+    const id = Number(req.params.id);
 
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+
+    const producto = await dbGet(
+      `SELECT 
+          p.id,
+          p.nombre,
+          p.precio,
+          p.stock,
+          c.nombre AS categoria
+        FROM productos p
+        JOIN categorias c ON c.id = p.categoria_id
+        WHERE p.id = ?`,
+      [id]
+    );
+
+    if (!producto) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+
+    res.json(producto);
+  } catch (err) {
+    console.error("Error al obtener producto por ID:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+}
+
+// ============================================
 // POST /api/productos
-
+// ============================================
 export async function crearProducto(req, res) {
   try {
     const errores = validarProducto(req.body);
@@ -65,93 +120,97 @@ export async function crearProducto(req, res) {
 
     const { nombre, precio, categoria, stock } = req.body;
 
-    const productos = await leerProductos();
+    // Obtener ID de categoría (crea si no existe)
+    const categoriaId = await obtenerCategoriaId(categoria);
 
-    const nextId = productos.length
-      ? Math.max(...productos.map((p) => p.id)) + 1
-      : 1;
+    const result = await dbRun(
+      `INSERT INTO productos (nombre, precio, stock, categoria_id)
+       VALUES (?, ?, ?, ?)`,
+      [nombre.trim(), Number(precio), Number(stock), categoriaId]
+    );
 
     const nuevo = {
-      id: nextId,
-      nombre: String(nombre).trim(),
-      categoria: String(categoria).trim(),
+      id: result.id,
+      nombre: nombre.trim(),
+      categoria,
       precio: Number(precio),
       stock: Number(stock),
     };
 
-   productos.push(nuevo);
-    await guardarProductos(productos);
-
     res.status(201).json(nuevo);
   } catch (err) {
-    console.error(err);
+    console.error("Error al crear producto:", err);
     res.status(500).json({ error: "Error al crear producto" });
   }
 }
 
-
+// ============================================
 // PUT /api/productos/:id
-
+// ============================================
 export async function actualizarProducto(req, res) {
   try {
     const id = Number(req.params.id);
     const { nombre, precio, categoria, stock } = req.body;
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
 
     const errores = validarProducto({ nombre, precio, categoria, stock });
     if (errores.length) {
       return res.status(400).json({ error: errores.join(". ") });
     }
 
-    const productos = await leerProductos();
-    const index = productos.findIndex((p) => p.id === id);
-
-    if (index === -1)
+    const existe = await dbGet("SELECT id FROM productos WHERE id = ?", [id]);
+    if (!existe) {
       return res.status(404).json({ error: "Producto no encontrado" });
+    }
 
-    productos[index] = {
+    const categoriaId = await obtenerCategoriaId(categoria);
+
+    await dbRun(
+      `UPDATE productos
+       SET nombre = ?, precio = ?, stock = ?, categoria_id = ?
+       WHERE id = ?`,
+      [nombre.trim(), Number(precio), Number(stock), categoriaId, id]
+    );
+
+    res.json({
       id,
-      nombre: String(nombre).trim(),
-      categoria: String(categoria).trim(),
+      nombre: nombre.trim(),
+      categoria,
       precio: Number(precio),
       stock: Number(stock),
-    };
-
-    await guardarProductos(productos);
-
-    res.json(productos[index]);
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Error al actualizar producto:", err);
     res.status(500).json({ error: "Error al actualizar producto" });
   }
 }
 
-
+// ============================================
 // DELETE /api/productos/:id
-
+// ============================================
 export async function eliminarProducto(req, res) {
-  const id = Number(req.params.id);
-
-  if (Number.isNaN(id)) {
-    return res.status(400).json({ error: "ID inválido" });
-  }
-
   try {
-    const productos = await leerProductos();
-    const index = productos.findIndex((p) => p.id === id);
+    const id = Number(req.params.id);
 
-    if (index === -1) {
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+
+    const result = await dbRun("DELETE FROM productos WHERE id = ?", [id]);
+
+    if (result.changes === 0) {
       return res.status(404).json({ error: "Producto no encontrado" });
     }
 
-    const [productoEliminado] = productos.splice(index, 1);
-    await guardarProductos(productos);
-
-    return res.json({
+    res.json({
       mensaje: "Producto eliminado correctamente",
-      data: productoEliminado,
+      id,
     });
-  } catch (error) {
-    console.error("Error al eliminar producto:", error);
-    return res.status(500).json({ error: "Error interno del servidor" });
+  } catch (err) {
+    console.error("Error al eliminar producto:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 }
