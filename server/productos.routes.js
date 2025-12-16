@@ -1,5 +1,5 @@
 
-// server/productos.routes.js
+
 import { Router } from "express";
 import {
   getProductos,

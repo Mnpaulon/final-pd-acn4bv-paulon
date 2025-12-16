@@ -1,10 +1,10 @@
 
-// server/productos.controller.js
+
 import { dbAll, dbGet, dbRun } from "./db/database.js";
 
-// ============================================
+
 // VALIDACIÓN
-// ============================================
+
 function validarProducto({ nombre, precio, categoria, stock }) {
   const errores = [];
 
@@ -29,9 +29,9 @@ function validarProducto({ nombre, precio, categoria, stock }) {
   return errores;
 }
 
-// ============================================
+
 // HELPER: obtener o crear categoría
-// ============================================
+
 async function obtenerCategoriaId(nombreCategoria) {
   const cat = await dbGet(
     "SELECT id FROM categorias WHERE nombre = ?",
@@ -49,9 +49,9 @@ async function obtenerCategoriaId(nombreCategoria) {
   return result.id;
 }
 
-// ============================================
+
 // GET /api/productos
-// ============================================
+
 export async function getProductos(req, res) {
   try {
     const productos = await dbAll(
@@ -73,9 +73,9 @@ export async function getProductos(req, res) {
   }
 }
 
-// ============================================
+
 // GET /api/productos/:id  (para vista detalle)
-// ============================================
+
 export async function getProductoPorId(req, res) {
   try {
     const id = Number(req.params.id);
@@ -108,9 +108,9 @@ export async function getProductoPorId(req, res) {
   }
 }
 
-// ============================================
+
 // POST /api/productos
-// ============================================
+
 export async function crearProducto(req, res) {
   try {
     const errores = validarProducto(req.body);
@@ -144,9 +144,9 @@ export async function crearProducto(req, res) {
   }
 }
 
-// ============================================
+
 // PUT /api/productos/:id
-// ============================================
+
 export async function actualizarProducto(req, res) {
   try {
     const id = Number(req.params.id);
@@ -188,9 +188,9 @@ export async function actualizarProducto(req, res) {
   }
 }
 
-// ============================================
+
 // DELETE /api/productos/:id
-// ============================================
+
 export async function eliminarProducto(req, res) {
   try {
     const id = Number(req.params.id);

@@ -1,43 +1,33 @@
 
 
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import { dbAll, dbGet, dbRun } from "./db/database.js";
 
-// Resolver ruta a usuarios.json
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_FILE = path.join(__dirname, "usuarios.json");
-
-// Leer archivo JSON
-async function leerUsuarios() {
-  const data = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(data);
-}
-
-// Guardar archivo JSON
-async function guardarUsuarios(lista) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(lista, null, 2));
+// Normaliza roles permitidos
+function normalizarRol(role) {
+  const r = String(role || "").toLowerCase().trim();
+  if (r === "admin") return "admin";
+  return "usuario"; // default
 }
 
 // GET /api/usuarios
-
 export async function getUsuarios(req, res) {
   try {
-    const usuarios = await leerUsuarios();
-    res.json(usuarios);
+    // Devolvemos SIN password_hash
+    const usuarios = await dbAll(
+      "SELECT id, username, role FROM usuarios ORDER BY id ASC"
+    );
+    return res.json(usuarios);
   } catch (error) {
     console.error("Error cargando usuarios:", error);
-    res.status(500).json({ error: "No se pudieron cargar los usuarios" });
+    return res.status(500).json({ error: "No se pudieron cargar los usuarios" });
   }
 }
 
-
 // POST /api/usuarios
-
 export async function crearUsuario(req, res) {
   try {
-    const { username, password, role } = req.body;
+    const { username, password, role } = req.body || {};
 
     if (!username || !password) {
       return res
@@ -45,57 +35,78 @@ export async function crearUsuario(req, res) {
         .json({ error: "Usuario y contraseña son obligatorios" });
     }
 
-    const usuarios = await leerUsuarios();
+    const usernameClean = String(username).trim();
 
-    // Evitar usuarios duplicados
-    if (usuarios.some((u) => u.username === username)) {
+    // Evitar duplicados
+    const existente = await dbGet(
+      "SELECT id FROM usuarios WHERE username = ?",
+      [usernameClean]
+    );
+    if (existente) {
       return res.status(400).json({ error: "El usuario ya existe" });
     }
 
-    const nuevo = {
-      id: Date.now(),
-      username,
-      password,
-      role: role?.toLowerCase() || "lector",
-    };
+    const roleClean = normalizarRol(role);
 
-    usuarios.push(nuevo);
-    await guardarUsuarios(usuarios);
+    // Hash password
+    const hash = await bcrypt.hash(String(password), 10);
 
-    res.status(201).json(nuevo);
+    const result = await dbRun(
+      "INSERT INTO usuarios (username, password_hash, role) VALUES (?,?,?)",
+      [usernameClean, hash, roleClean]
+    );
+
+    const creado = await dbGet(
+      "SELECT id, username, role FROM usuarios WHERE id = ?",
+      [result.id]
+    );
+
+    return res.status(201).json(creado);
   } catch (error) {
     console.error("Error creando usuario:", error);
-    res.status(500).json({ error: "No se pudo crear el usuario" });
+    return res.status(500).json({ error: "No se pudo crear el usuario" });
   }
 }
 
-
 // DELETE /api/usuarios/:id
-
 export async function eliminarUsuario(req, res) {
   try {
     const id = Number(req.params.id);
-    const usuarios = await leerUsuarios();
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
 
-    const existe = usuarios.find((u) => u.id === id);
+    // No permitir borrarse a sí mismo (si el middleware pone req.user)
+    if (req.user && Number(req.user.id) === id) {
+      return res.status(400).json({ error: "No podés eliminar tu propia cuenta" });
+    }
+
+    const existe = await dbGet(
+      "SELECT id, role FROM usuarios WHERE id = ?",
+      [id]
+    );
     if (!existe) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
     // NO permitir eliminar al único admin
-    const admins = usuarios.filter((u) => u.role === "admin");
-    if (admins.length === 1 && existe.role === "admin") {
-      return res
-        .status(400)
-        .json({ error: "No se puede eliminar el único usuario administrador" });
+    if (existe.role === "admin") {
+      const row = await dbGet(
+        "SELECT COUNT(*) AS total FROM usuarios WHERE role = 'admin'"
+      );
+      const totalAdmins = row?.total ?? 0;
+
+      if (totalAdmins <= 1) {
+        return res
+          .status(400)
+          .json({ error: "No se puede eliminar el único usuario administrador" });
+      }
     }
 
-    const listaActualizada = usuarios.filter((u) => u.id !== id);
-    await guardarUsuarios(listaActualizada);
-
-    res.json({ mensaje: "Usuario eliminado" });
+    await dbRun("DELETE FROM usuarios WHERE id = ?", [id]);
+    return res.json({ mensaje: "Usuario eliminado" });
   } catch (error) {
     console.error("Error eliminando usuario:", error);
-    res.status(500).json({ error: "No se pudo eliminar el usuario" });
+    return res.status(500).json({ error: "No se pudo eliminar el usuario" });
   }
 }
